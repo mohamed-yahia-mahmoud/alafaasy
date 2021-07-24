@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "393688163743",
+    "project_id": "alafasy-479bb",
+    "storage_bucket": "alafasy-479bb.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:393688163743:android:ad2b57eb262d14d7af89aa",
+        "android_client_info": {
+          "package_name": "com.mohamed_yahiaElomda.alafaasy"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "393688163743-15o224gl25h5eg98nbdci1v899v5dm5v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAK6WOqHAAGekYmFhSxyaB8PPodkQkPxfw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "393688163743-15o224gl25h5eg98nbdci1v899v5dm5v.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
