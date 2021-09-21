@@ -4,13 +4,14 @@ import 'package:alafaasy/mobx/QuranMobx.dart';
 import 'package:alafaasy/statefull/AboutShikh.dart';
 import 'package:alafaasy/statefull/Player.dart';
 import 'package:alafaasy/statless/AlertLogOut.dart';
-import 'package:alafaasy/statless/settingListItem.dart';
-import 'package:firebase_admob/firebase_admob.dart';
-import 'package:flutter/material.dart';
+  import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:flutter_zoom_drawer/flutter_zoom_drawer.dart';
+ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
-import 'package:toast/toast.dart';
+import 'package:launch_review/launch_review.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'Ad_helper.dart';
 
 
 const String testDevice ='3ADF6D1F2FF900409FCD7AFFF73CF972';
@@ -31,68 +32,19 @@ class _HomeState extends State<Home> {
   //---------------------------------- ad initialization -------------------------------------
 
 
-  static const MobileAdTargetingInfo targetingInfo=MobileAdTargetingInfo(
-      keywords: <String>['quran', 'alafasy'],
-      contentUrl: 'https://flutter.io',
-      childDirected: false,
-      testDevices: <String>[testDevice]
-  );
 
 
-  BannerAd _bannerAd;
 
-  final String IOS_AD_UNIT_BANNER="";
 
-  final String ANDROID_AD_UNIT_BANNER="ca-app-pub-8165719959159108/7154726200";
 
-  final String IOS_APP_ID="";
-
-  final String ANDROID_APP_ID="ca-app-pub-8165719959159108~7737411643";
-
+  BannerAd _Ad;
+  bool isLoaded=false;
 
   int myIndex=0;
 
 
-  String getAppId() {
 
-    print ("get app id ");
-    print(Platform.isIOS);
-    print(Platform.isAndroid);
-    if (Platform.isIOS) {
-      return IOS_APP_ID;
-    } else if (Platform.isAndroid) {
-      return ANDROID_APP_ID;
-    }
-    return null;
-  }
 
-  BannerAd createBannerAd(){
-    return BannerAd(
-        adUnitId:  getBannerAdUnitId() ,
-        size: AdSize.fullBanner,
-        targetingInfo: targetingInfo,
-        listener: (MobileAdEvent event) {
-          if (event == MobileAdEvent.loaded) {
-            _bannerAd.show(anchorOffset: -10.0, anchorType: AnchorType.bottom,  horizontalCenterOffset: 0.0,);
-
-          }
-        }
-    );
-  }
-
-  String getBannerAdUnitId() {
-    print("*******************");
-    print("getBannerAdUnitId");
-    print(Platform.isAndroid);
-
-    if (Platform.isAndroid) {
-      return ANDROID_AD_UNIT_BANNER;
-    } else {
-      return IOS_AD_UNIT_BANNER;
-
-    }
-
-  }
 
 //------------------------------------------------------------------------------------------------
 
@@ -102,24 +54,51 @@ class _HomeState extends State<Home> {
 
   @override
   void initState() {
-
-    FirebaseAdMob.instance.initialize(appId: getAppId());
-    _bannerAd=createBannerAd()..load()..show(
-      anchorOffset: 0.0,
-      anchorType: AnchorType.bottom,
-      horizontalCenterOffset: 0.0,
-    );
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       con.getMySuraId();
     });
     super.initState();
+    _Ad=BannerAd(
+        adUnitId: AdHelper.bannerAdUnitId,
+        request: AdRequest(),
+        size: AdSize.banner,
+        listener: AdListener(
+            onAdLoaded: (_){
+              setState(() {
+                isLoaded=true;
+              });
+            },
+            onAdFailedToLoad: (_,error){
+              print('AD failed to load with error $error');
+            }
+        )
+    );
+    _Ad.load();
+
+  }
+
+
+  Widget checkForAd(){
+    if(isLoaded){
+      return Container(
+        width: _Ad.size.width.toDouble(),
+        height: _Ad.size.height.toDouble(),
+        child: AdWidget(
+          ad: _Ad,
+        ),
+        // width: _Ad.size.width.toDouble(),
+        // height: _Ad.size.height.toDouble(),
+        alignment: Alignment.bottomCenter,
+      );
+    }else{
+      return Container();
+    }
   }
 
   @override
   void dispose() {
-    _bannerAd.dispose();
-    super.dispose();
+    _Ad?.dispose();
+     super.dispose();
   }
 
 
@@ -202,7 +181,12 @@ class _HomeState extends State<Home> {
 
               ListTile(
                 title: Center(child: Text("قيم التطبيق",style: TextStyle(color: Colors.green,fontSize: 18),)),
-                onTap: (){},
+                onTap: (){
+                  LaunchReview.launch(
+                    androidAppId: "com.mohamed_yahiaElomda.alafaasy",
+                    iOSAppId: "",
+                  );
+                },
               ),
 
               //         ====================== Divider =======================
@@ -219,9 +203,13 @@ class _HomeState extends State<Home> {
 
               ListTile(
                 title: Center(child: Text("تطبيقات أخرى",style: TextStyle(color: Colors.green,fontSize: 18,),)),
-                onTap: (){
-                  Toast.show("حاليا لا توجد تطبيقات اخري ولكن سيتم اضافتها قريبا", context, duration: Toast.LENGTH_SHORT, gravity:  Toast.TOP);
-
+                onTap: ()async{
+                  if (await canLaunch("https://play.google.com/store/apps/developer?id=mohamed+yahia")) {
+                    await launch("https://play.google.com/store/apps/developer?id=mohamed+yahia");
+                  }
+                  else {
+                    throw 'Could not launch "https://play.google.com/store/apps/developer?id=mohamed+yahia"';
+                  }
                 },
               ),
 
@@ -278,12 +266,15 @@ class _HomeState extends State<Home> {
         body: Observer(
           builder: (_) {
             return Container(
-              child: Container(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                  child: Container(
+              height: MediaQuery.of(context).size.height,
+
+              child: Column(
+                children: [
+
+                  Container(
                     width: (MediaQuery.of(context).size.width),
-                    height: (MediaQuery.of(context).size.height*.78),
+                    height: isLoaded?((MediaQuery.of(context).size.height*.87)-(_Ad.size.height.toDouble()+4.0))
+                        :(MediaQuery.of(context).size.height*.87),
                     child: ListView.builder(
                         padding: const EdgeInsets.all(8),
                         itemCount: con.suarsNames.length ,
@@ -378,7 +369,10 @@ class _HomeState extends State<Home> {
                         }
                     ),
                   ),
-                ),
+
+                  checkForAd(),
+
+                ],
               ),
             );
 

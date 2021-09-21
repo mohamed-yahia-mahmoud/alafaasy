@@ -65,3 +65,10 @@ dependencies {
     implementation 'com.google.firebase:firebase-analytics'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 }
+
+configurations.all {
+    resolutionStrategy {
+        force 'androidx.core:core:1.6.0'
+        force 'androidx.core:core-ktx:1.6.0'
+    }
+}

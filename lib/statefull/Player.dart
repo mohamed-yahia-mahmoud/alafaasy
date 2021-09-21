@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:alafaasy/mobx/QuranMobx.dart';
@@ -6,6 +7,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:math' as math;
+import 'package:connectivity/connectivity.dart';
+import 'package:flutter/services.dart';
 
 
 
@@ -25,7 +28,9 @@ class PlayerPage extends StatefulWidget {
 class _PlayerPageState extends State<PlayerPage> with TickerProviderStateMixin {
 
   QuranMobx con;
-
+  String _connectionStatus = 'Unknown';
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<ConnectivityResult> _connectivitySubscription;
   AnimationController _animationIconController1;
 
 
@@ -39,6 +44,9 @@ class _PlayerPageState extends State<PlayerPage> with TickerProviderStateMixin {
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      initConnectivity();
+      _connectivitySubscription =
+          _connectivity.onConnectivityChanged.listen(_updateConnectionStatus);
 
       if(widget.newone){
         con.my_position = con.my_slider;
@@ -79,14 +87,66 @@ class _PlayerPageState extends State<PlayerPage> with TickerProviderStateMixin {
         };
         _animationIconController1.forward();
       }
-
-
-
     });
+  }
 
+
+  void showInSnackBar(String value) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Container(height: 25,child: Center(child: Text(value,style: TextStyle(fontSize: 18,color: Colors.white),)))));
 
   }
 
+  Future<void> initConnectivity() async {
+
+    // Platform messages may fail, so we use a try/catch PlatformException.
+    try {
+      con.result = await _connectivity.checkConnectivity();
+    } on PlatformException catch (e) {
+      print(e.toString());
+    }
+
+    // If the widget was removed from the tree while the asynchronous platform
+    // message was in flight, we want to discard the reply rather than calling
+    // setState to update our non-existent appearance.
+    if (!mounted) {
+      return Future.value(null);
+    }
+
+    return _updateConnectionStatus(con.result);
+  }
+
+  Future<void> _updateConnectionStatus(ConnectivityResult result) async {
+    switch (result) {
+      case ConnectivityResult.wifi:
+        _connectionStatus="connected";
+
+        break;
+      case ConnectivityResult.mobile:
+        _connectionStatus="connected";
+
+        break;
+      case ConnectivityResult.none:
+
+        try {
+          showInSnackBar("لا يوجد اتصال بالانترنت 🙁");
+          setState(() => _connectionStatus = result.toString());
+        } on PlatformException catch (e) {
+          print(e.toString());
+        }
+
+        break;
+      default:
+        setState(() => _connectionStatus = 'Failed to get connectivity.');
+        break;
+    }
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription.cancel();
+    super.dispose();
+
+  }
 
 
   @override
@@ -209,16 +269,22 @@ class _PlayerPageState extends State<PlayerPage> with TickerProviderStateMixin {
                                 InkWell(
                                   onTap: () {
                                     if(mounted) {
-                                      setState(() {
-                                        con.isSuraPlaying = true;
-                                         _animationIconController1.forward();
-                                        con.currentIndex = con.currentIndex - 1;
-                                        con.audioPlayer.play(
-                                            "${con.url}${con.surasId[con
-                                                .currentIndex]}.mp3");
-                                      });
+
+                                      if(_connectionStatus!=null&&_connectionStatus=="connected"){
+                                        setState(() {
+                                          con.isSuraPlaying = true;
+                                          _animationIconController1.forward();
+                                          con.currentIndex = con.currentIndex - 1;
+                                          con.audioPlayer.play(
+                                              "${con.url}${con.surasId[con
+                                                  .currentIndex]}.mp3");
+                                        });
+                                      }
+                                      else{
+                                        showInSnackBar("لا يوجد اتصال بالانترنت 🙁");
+                                      }
                                     }
-                                                                    },
+                                    },
                                   child: Icon(
                                     Icons.fast_forward,
                                     size: 35,
@@ -231,11 +297,18 @@ class _PlayerPageState extends State<PlayerPage> with TickerProviderStateMixin {
                                 //backward 10 seconds
                                 InkWell(
                                   onTap: () {
-                                    con.audioPlayer.seek(
-                                      Duration(
-                                        milliseconds: con.my_position.inMilliseconds - 10000,
-                                      ),
-                                    );
+
+                                    if(_connectionStatus!=null&&_connectionStatus=="connected"){
+                                      con.audioPlayer.seek(
+                                        Duration(
+                                          milliseconds: con.my_position.inMilliseconds - 10000,
+                                        ),
+                                      );
+                                    }
+                                    else{
+                                      showInSnackBar("لا يوجد اتصال بالانترنت 🙁");
+                                    }
+
                                   },
                                   child: Transform(
                                     alignment: Alignment.center,
@@ -248,18 +321,41 @@ class _PlayerPageState extends State<PlayerPage> with TickerProviderStateMixin {
                                 GestureDetector(
                                   onTap: () {
                                     if(mounted){
-                                    setState(() {
-                                                  if (!con.isSuraPlaying) {
-                                                    con.audioPlayer.play("${con.url}${con.surasId[con.currentIndex]}.mp3");
-                                                   /* con.myIcon=Icon(Icons.pause,color: Colors.white,size: 35,);*/
-                                                    _animationIconController1.forward();
-                                                  } else {
-                                                    con.audioPlayer.pause();
-                                                  _animationIconController1.reverse();
-                                                   }
-                                                   con.isSuraPlaying = !con.isSuraPlaying;
-                                                 },
-                                    );
+
+                                      if(_connectionStatus!=null&&_connectionStatus=="connected"){
+                                        setState(() {
+                                          if (!con.isSuraPlaying) {
+                                            print('my url :  ${con.url}${con.surasId[con.currentIndex]}.mp3');
+                                            con.audioPlayer.play("${con.url}${con.surasId[con.currentIndex]}.mp3");
+                                            _animationIconController1.forward();
+
+                                            con.audioPlayer.onPlayerCompletion.listen((event) {
+
+                                              setState(() {
+                                                _animationIconController1.reverse();
+                                                if(con.currentIndex<113){
+                                                  con.isSuraPlaying=true;
+                                                  _animationIconController1.forward();
+                                                  con.currentIndex=con.currentIndex+1;
+                                                  con.audioPlayer.play("${con.url}${con.surasId[con.currentIndex]}.mp3");
+
+                                                }
+                                              });
+
+
+                                            });
+
+                                          } else {
+                                            con.audioPlayer.pause();
+                                            _animationIconController1.reverse();
+                                          }
+                                          con.isSuraPlaying = !con.isSuraPlaying;
+                                        },
+                                        );
+                                      }else{
+                                        showInSnackBar("لا يوجد اتصال بالانترنت 🙁");
+                                      }
+
                                     }
                                   },
                                   child: ClipOval(
@@ -280,11 +376,16 @@ class _PlayerPageState extends State<PlayerPage> with TickerProviderStateMixin {
                                 //forward 10 seconds
                                 InkWell(
                                   onTap: () {
-                                    con.audioPlayer.seek(
-                                      Duration(
-                                        milliseconds: con.my_position.inMilliseconds + 10000,
-                                      ),
-                                    );
+                                    if(_connectionStatus!=null&&_connectionStatus=="connected"){
+                                      con.audioPlayer.seek(
+                                        Duration(
+                                          milliseconds: con.my_position.inMilliseconds + 10000,
+                                        ),
+                                      );
+                                    }
+                                    else{
+                                      showInSnackBar("لا يوجد اتصال بالانترنت 🙁");
+                                    }
                                   },
                                   child: Icon(
                                     Icons.replay,
@@ -296,13 +397,17 @@ class _PlayerPageState extends State<PlayerPage> with TickerProviderStateMixin {
                                 InkWell(
                                   onTap: () {
                                     if(mounted){
-                                      setState(() {
-                                        con.isSuraPlaying=true;
-                                        /* con.myIcon=Icon(Icons.pause,color: Colors.white,size: 35,);*/
-                                        _animationIconController1.forward();
-                                        con.currentIndex=con.currentIndex+1;
-                                        con.audioPlayer.play("${con.url}${con.surasId[con.currentIndex]}.mp3");
-                                      });
+                                      if(_connectionStatus!=null&&_connectionStatus=="connected"){
+                                        setState(() {
+                                          con.isSuraPlaying=true;
+                                          _animationIconController1.forward();
+                                          con.currentIndex=con.currentIndex+1;
+                                          con.audioPlayer.play("${con.url}${con.surasId[con.currentIndex]}.mp3");
+                                        });
+                                      }
+                                      else{
+                                        showInSnackBar("لا يوجد اتصال بالانترنت 🙁");
+                                      }
                                     }
 
 
